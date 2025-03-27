@@ -41,7 +41,7 @@ class HistoryTreeProcessor:
 		def process_node(node: DOMElementNode):
 			if node.highlight_index is not None:
 				hashed_node = HistoryTreeProcessor._hash_dom_element(node)
-				if hashed_node == hashed_dom_history_element:
+				if hashed_node.xpath_hash == hashed_dom_history_element.xpath_hash:
 					return node
 			for child in node.children:
 				if isinstance(child, DOMElementNode):
