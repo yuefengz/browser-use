@@ -30,7 +30,7 @@ from browser_use.controller.views import (
 	SendKeysAction,
 	SwitchTabAction,
 )
-from browser_use.utils import time_execution_sync
+from browser_use.utils import time_execution_sync, markdownify_html
 
 logger = logging.getLogger(__name__)
 
@@ -218,25 +218,19 @@ class Controller(Generic[Context]):
 
 		# Content Actions
 		@self.registry.action(
-			'Extract page content to retrieve specific information from the page, e.g. all company names, a specific description, all information about, links with companies in structured format or simply links',
+			'Extract page content to retrieve specific information from the page, e.g. all company names, a specific description, all information about, links with companies in structured format or simply links. Include details about the output format in the `goal`.',
 		)
 		async def extract_content(
 			goal: str, should_strip_link_urls: bool, browser: BrowserContext, page_extraction_llm: BaseChatModel
 		):
 			page = await browser.get_current_page()
-			import markdownify
-
-			strip = []
-			if should_strip_link_urls:
-				strip = ['a', 'img']
-
-			content = markdownify.markdownify(await page.content(), strip=strip)
+			content = markdownify_html(await page.content())
 
 			# manually append iframe text into the content so it's readable by the LLM (includes cross-origin iframes)
 			for iframe in page.frames:
 				if iframe.url != page.url and not iframe.url.startswith('data:'):
 					content += f'\n\nIFRAME {iframe.url}:\n'
-					content += markdownify.markdownify(await iframe.content())
+					content += markdownify_html(await iframe.content())
 
 			prompt = 'Your task is to extract the content of the page. You will be given a page and a goal and you should extract all relevant information around this goal from the page. If the goal is vague, summarize the page. Respond in json format. Extraction goal: {goal}, Page: {page}'
 			template = PromptTemplate(input_variables=['goal', 'page'], template=prompt)
