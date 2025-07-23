@@ -3,6 +3,9 @@ import hashlib
 from browser_use.dom.history_tree_processor.view import DOMHistoryElement, HashedDomElement
 from browser_use.dom.views import DOMElementNode
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class HistoryTreeProcessor:
 	""" "
@@ -37,7 +40,7 @@ class HistoryTreeProcessor:
 		def process_node(node: DOMElementNode):
 			if node.highlight_index is not None:
 				hashed_node = HistoryTreeProcessor._hash_dom_element(node)
-				if hashed_node == hashed_dom_history_element:
+				if hashed_node.xpath_hash == hashed_dom_history_element.xpath_hash:
 					return node
 			for child in node.children:
 				if isinstance(child, DOMElementNode):
@@ -92,7 +95,8 @@ class HistoryTreeProcessor:
 
 	@staticmethod
 	def _attributes_hash(attributes: dict[str, str]) -> str:
-		attributes_string = ''.join(f'{key}={value}' for key, value in attributes.items())
+		attributes.pop("id", None)  # id=ember561 always change on linkedin
+		attributes_string = ''.join(f'{key}={value}' for key, value in sorted(attributes.items()))
 		return hashlib.sha256(attributes_string.encode()).hexdigest()
 
 	@staticmethod

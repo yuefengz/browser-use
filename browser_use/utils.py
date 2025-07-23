@@ -7,7 +7,9 @@ import time
 from collections.abc import Callable, Coroutine
 from fnmatch import fnmatch
 from functools import cache, wraps
+from markdownify import markdownify as md
 from pathlib import Path
+from readabilipy import simple_json_from_html_string
 from sys import stderr
 from typing import Any, ParamSpec, TypeVar
 from urllib.parse import urlparse
@@ -391,6 +393,12 @@ def singleton(cls):
 def check_env_variables(keys: list[str], any_or_all=all) -> bool:
 	"""Check if all required environment variables are set"""
 	return any_or_all(os.getenv(key, '').strip() for key in keys)
+
+
+def markdownify_html(html: str) -> str:
+	article = simple_json_from_html_string(html, use_readability=True)
+	text = md(article["content"])
+	return text
 
 
 def is_unsafe_pattern(pattern: str) -> bool:
