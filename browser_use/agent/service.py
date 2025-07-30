@@ -10,7 +10,7 @@ import tempfile
 import time
 from collections.abc import Awaitable, Callable
 from pathlib import Path
-from typing import Any, Generic, TypeVar
+from typing import Any, Generic, Literal, TypeVar
 from urllib.parse import urlparse
 
 from dotenv import load_dotenv
@@ -184,10 +184,13 @@ class Agent(Generic[Context, AgentStructuredOutput]):
 		calculate_cost: bool = False,
 		display_files_in_done_text: bool = True,
 		include_tool_call_examples: bool = False,
+		vision_detail_level: Literal['auto', 'low', 'high'] = 'auto',
 		llm_timeout: int = 60,
 		step_timeout: int = 180,
 		**kwargs,
 	):
+		if not isinstance(llm, BaseChatModel):
+			raise ValueError('invalid llm, must be from browser_use.llm')
 		# Check for deprecated planner parameters
 		planner_params = [planner_llm, use_vision_for_planner, is_planner_reasoning, extend_planner_system_message]
 		if any(param is not None and param is not False for param in planner_params) or planner_interval != 1:
@@ -239,6 +242,7 @@ class Agent(Generic[Context, AgentStructuredOutput]):
 
 		self.settings = AgentSettings(
 			use_vision=use_vision,
+			vision_detail_level=vision_detail_level,
 			use_vision_for_planner=False,  # Always False now (deprecated)
 			save_conversation_path=save_conversation_path,
 			save_conversation_path_encoding=save_conversation_path_encoding,
@@ -332,6 +336,7 @@ class Agent(Generic[Context, AgentStructuredOutput]):
 			sensitive_data=sensitive_data,
 			max_history_items=self.settings.max_history_items,
 			images_per_step=self.settings.images_per_step,
+			vision_detail_level=self.settings.vision_detail_level,
 			include_tool_call_examples=self.settings.include_tool_call_examples,
 		)
 
@@ -1349,9 +1354,10 @@ class Agent(Generic[Context, AgentStructuredOutput]):
 
 				create_history_gif(task=self.task, history=self.state.history, output_path=output_path)
 
-				# Emit output file generated event for GIF
-				output_event = await CreateAgentOutputFileEvent.from_agent_and_file(self, output_path)
-				self.eventbus.dispatch(output_event)
+				# Only emit output file event if GIF was actually created
+				if Path(output_path).exists():
+					output_event = await CreateAgentOutputFileEvent.from_agent_and_file(self, output_path)
+					self.eventbus.dispatch(output_event)
 
 			# Wait briefly for cloud auth to start and print the URL, but don't block for completion
 			if self.enable_cloud_sync and hasattr(self, 'cloud_sync'):
