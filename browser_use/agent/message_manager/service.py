@@ -9,7 +9,6 @@ from browser_use.agent.message_manager.views import (
 from browser_use.agent.prompts import AgentMessagePrompt
 from browser_use.agent.views import (
 	ActionResult,
-	AgentHistoryList,
 	AgentOutput,
 	AgentStepInfo,
 	MessageManagerState,
@@ -104,10 +103,8 @@ class MessageManager:
 		state: MessageManagerState = MessageManagerState(),
 		use_thinking: bool = True,
 		include_attributes: list[str] | None = None,
-		message_context: str | None = None,
 		sensitive_data: dict[str, str | dict[str, str]] | None = None,
 		max_history_items: int | None = None,
-		images_per_step: int = 1,
 		vision_detail_level: Literal['auto', 'low', 'high'] = 'auto',
 		include_tool_call_examples: bool = False,
 	):
@@ -118,7 +115,6 @@ class MessageManager:
 		self.sensitive_data_description = ''
 		self.use_thinking = use_thinking
 		self.max_history_items = max_history_items
-		self.images_per_step = images_per_step
 		self.vision_detail_level = vision_detail_level
 		self.include_tool_call_examples = include_tool_call_examples
 
@@ -126,12 +122,11 @@ class MessageManager:
 
 		# Store settings as direct attributes instead of in a settings object
 		self.include_attributes = include_attributes or []
-		self.message_context = message_context
 		self.sensitive_data = sensitive_data
 		self.last_input_messages = []
 		# Only initialize messages if state is empty
 		if len(self.state.history.get_messages()) == 0:
-			self._add_message_with_type(self.system_prompt, 'system')
+			self._set_message_with_type(self.system_prompt, 'system')
 
 	@property
 	def agent_history_description(self) -> str:
@@ -167,7 +162,6 @@ class MessageManager:
 		task_update_item = HistoryItem(system_message=f'User updated <user_request> to: {new_task}')
 		self.state.agent_history_items.append(task_update_item)
 
-	@observe_debug(ignore_input=True, ignore_output=True, name='update_agent_history_description')
 	def _update_agent_history_description(
 		self,
 		model_output: AgentOutput | None = None,
@@ -249,9 +243,9 @@ class MessageManager:
 
 		return ''
 
-	@observe_debug(ignore_input=True, ignore_output=True, name='add_state_message')
-	@time_execution_sync('--add_state_message')
-	def add_state_message(
+	@observe_debug(ignore_input=True, ignore_output=True, name='create_state_messages')
+	@time_execution_sync('--create_state_messages')
+	def create_state_messages(
 		self,
 		browser_state_summary: BrowserStateSummary,
 		model_output: AgentOutput | None = None,
@@ -260,27 +254,24 @@ class MessageManager:
 		use_vision=True,
 		page_filtered_actions: str | None = None,
 		sensitive_data=None,
-		agent_history_list: AgentHistoryList | None = None,  # Pass AgentHistoryList from agent
 		available_file_paths: list[str] | None = None,  # Always pass current available_file_paths
 	) -> None:
-		"""Add browser state as human message"""
+		"""Create single state message with all content"""
 
+		# Clear contextual messages from previous steps to prevent accumulation
+		self.state.history.context_messages.clear()
+
+		# First, update the agent history items with the latest step results
 		self._update_agent_history_description(model_output, result, step_info)
 		if sensitive_data:
 			self.sensitive_data_description = self._get_sensitive_data_description(browser_state_summary.url)
 
-		# Extract previous screenshots if we need more than 1 image and have agent history
+		# Use only the current screenshot
 		screenshots = []
-		if agent_history_list and self.images_per_step > 1:
-			# Get previous screenshots and filter out None values
-			raw_screenshots = agent_history_list.screenshots(n_last=self.images_per_step - 1, return_none_if_not_screenshot=False)
-			screenshots = [s for s in raw_screenshots if s is not None]
-
-		# add current screenshot to the end
 		if browser_state_summary.screenshot:
 			screenshots.append(browser_state_summary.screenshot)
 
-		# otherwise add state message and result to next message (which will not stay in memory)
+		# Create single state message with all content
 		assert browser_state_summary
 		state_message = AgentMessagePrompt(
 			browser_state_summary=browser_state_summary,
@@ -297,7 +288,8 @@ class MessageManager:
 			vision_detail_level=self.vision_detail_level,
 		).get_user_message(use_vision)
 
-		self._add_message_with_type(state_message, 'state')
+		# Set the state message with caching enabled
+		self._set_message_with_type(state_message, 'state')
 
 	def _log_history_lines(self) -> str:
 		"""Generate a formatted log string of message history for debugging / printing to terminal"""
@@ -345,9 +337,8 @@ class MessageManager:
 		self.last_input_messages = self.state.history.get_messages()
 		return self.last_input_messages
 
-	def _add_message_with_type(self, message: BaseMessage, message_type: Literal['system', 'state', 'consistent']) -> None:
-		"""Add message to history"""
-
+	def _set_message_with_type(self, message: BaseMessage, message_type: Literal['system', 'state']) -> None:
+		"""Replace a specific state message slot with a new message"""
 		# filter out sensitive data from the message
 		if self.sensitive_data:
 			message = self._filter_sensitive_data(message)
@@ -356,10 +347,16 @@ class MessageManager:
 			self.state.history.system_message = message
 		elif message_type == 'state':
 			self.state.history.state_message = message
-		elif message_type == 'consistent':
-			self.state.history.consistent_messages.append(message)
 		else:
-			raise ValueError(f'Invalid message type: {message_type}')
+			raise ValueError(f'Invalid state message type: {message_type}')
+
+	def _add_context_message(self, message: BaseMessage) -> None:
+		"""Add a contextual message specific to this step (e.g., validation errors, retry instructions, timeout warnings)"""
+		# filter out sensitive data from the message
+		if self.sensitive_data:
+			message = self._filter_sensitive_data(message)
+
+		self.state.history.context_messages.append(message)
 
 	@time_execution_sync('--filter_sensitive_data')
 	def _filter_sensitive_data(self, message: BaseMessage) -> BaseMessage:
