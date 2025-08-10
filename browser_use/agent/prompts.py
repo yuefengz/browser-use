@@ -110,10 +110,20 @@ class AgentMessagePrompt:
 
 	@observe_debug(ignore_input=True, ignore_output=True, name='_get_browser_state_description')
 	def _get_browser_state_description(self) -> str:
-		elements_text = self.browser_state.element_tree.clickable_elements_to_string(include_attributes=self.include_attributes)
+		# Get clickable and hoverable elements separately
+		clickable_text = self.browser_state.element_tree.clickable_elements_to_string(include_attributes=self.include_attributes)
+		hoverable_text = self.browser_state.element_tree.hoverable_elements_to_string(include_attributes=self.include_attributes)
 
-		if len(elements_text) > self.max_clickable_elements_length:
-			elements_text = elements_text[: self.max_clickable_elements_length]
+		# Handle truncation for the combined content
+		combined_length = len(clickable_text) + len(hoverable_text)
+		if combined_length > self.max_clickable_elements_length:
+			# Prioritize clickable elements, then add hoverable elements if space allows
+			if len(clickable_text) > self.max_clickable_elements_length:
+				clickable_text = clickable_text[: self.max_clickable_elements_length]
+				hoverable_text = ''  # No space for hoverable elements
+			else:
+				remaining_space = self.max_clickable_elements_length - len(clickable_text)
+				hoverable_text = hoverable_text[: remaining_space]
 			truncated_text = f' (truncated to {self.max_clickable_elements_length} characters)'
 		else:
 			truncated_text = ''
@@ -132,27 +142,36 @@ class AgentMessagePrompt:
 			current_page_position = pi.scroll_y / max(pi.page_height - pi.viewport_height, 1)
 			page_info_text = f'Page info: {pi.viewport_width}x{pi.viewport_height}px viewport, {pi.page_width}x{pi.page_height}px total page size, {pages_above:.1f} pages above, {pages_below:.1f} pages below, {total_pages:.1f} total pages, at {current_page_position:.0%} of page'
 
-		if elements_text != '':
+		# Format clickable elements section
+		clickable_section = ''
+		if clickable_text != '':
 			if has_content_above:
 				if self.browser_state.page_info:
 					pi = self.browser_state.page_info
 					pages_above = pi.pixels_above / pi.viewport_height if pi.viewport_height > 0 else 0
-					elements_text = f'... {self.browser_state.pixels_above} pixels above ({pages_above:.1f} pages) - scroll to see more or extract structured data if you are looking for specific information ...\n{elements_text}'
+					clickable_section = f'... {self.browser_state.pixels_above} pixels above ({pages_above:.1f} pages) - scroll to see more or extract structured data if you are looking for specific information ...\n{clickable_text}'
 				else:
-					elements_text = f'... {self.browser_state.pixels_above} pixels above - scroll to see more or extract structured data if you are looking for specific information ...\n{elements_text}'
+					clickable_section = f'... {self.browser_state.pixels_above} pixels above - scroll to see more or extract structured data if you are looking for specific information ...\n{clickable_text}'
 			else:
-				elements_text = f'[Start of page]\n{elements_text}'
+				clickable_section = f'[Start of page]\n{clickable_text}'
 			if has_content_below:
 				if self.browser_state.page_info:
 					pi = self.browser_state.page_info
 					pages_below = pi.pixels_below / pi.viewport_height if pi.viewport_height > 0 else 0
-					elements_text = f'{elements_text}\n... {self.browser_state.pixels_below} pixels below ({pages_below:.1f} pages) - scroll to see more or extract structured data if you are looking for specific information ...'
+					clickable_section = f'{clickable_section}\n... {self.browser_state.pixels_below} pixels below ({pages_below:.1f} pages) - scroll to see more or extract structured data if you are looking for specific information ...'
 				else:
-					elements_text = f'{elements_text}\n... {self.browser_state.pixels_below} pixels below - scroll to see more or extract structured data if you are looking for specific information ...'
+					clickable_section = f'{clickable_section}\n... {self.browser_state.pixels_below} pixels below - scroll to see more or extract structured data if you are looking for specific information ...'
 			else:
-				elements_text = f'{elements_text}\n[End of page]'
+				clickable_section = f'{clickable_section}\n[End of page]'
 		else:
-			elements_text = 'empty page'
+			clickable_section = 'no clickable elements'
+
+		# Format hoverable elements section
+		hoverable_section = ''
+		if hoverable_text != '':
+			hoverable_section = hoverable_text
+		else:
+			hoverable_section = 'no hoverable elements'
 
 		tabs_text = ''
 		current_tab_candidates = []
@@ -180,8 +199,11 @@ class AgentMessagePrompt:
 Available tabs:
 {tabs_text}
 {page_info_text}
-{pdf_message}Interactive elements from top layer of the current page inside the viewport{truncated_text}:
-{elements_text}
+{pdf_message}Clickable elements (marked with [index] - can be clicked by agents){truncated_text}:
+{clickable_section}
+
+Hoverable elements (marked with [index] or (H) - may reveal additional content when hovered):
+{hoverable_section}
 """
 		return browser_state
 

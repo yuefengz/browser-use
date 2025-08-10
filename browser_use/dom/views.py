@@ -82,6 +82,7 @@ class DOMElementNode(DOMBaseNode):
 	attributes: dict[str, str]
 	children: list[DOMBaseNode]
 	is_interactive: bool = False
+	is_hoverable: bool = False
 	is_top_element: bool = False
 	is_in_viewport: bool = False
 	shadow_root: bool = False
@@ -104,6 +105,7 @@ class DOMElementNode(DOMBaseNode):
 			'attributes': self.attributes,
 			'is_visible': self.is_visible,
 			'is_interactive': self.is_interactive,
+			'is_hoverable': self.is_hoverable,
 			'is_top_element': self.is_top_element,
 			'is_in_viewport': self.is_in_viewport,
 			'shadow_root': self.shadow_root,
@@ -125,6 +127,8 @@ class DOMElementNode(DOMBaseNode):
 		extras = []
 		if self.is_interactive:
 			extras.append('interactive')
+		if self.is_hoverable:
+			extras.append('hoverable')
 		if self.is_top_element:
 			extras.append('top')
 		if self.shadow_root:
@@ -180,8 +184,8 @@ class DOMElementNode(DOMBaseNode):
 			depth_str = depth * '\t'
 
 			if isinstance(node, DOMElementNode):
-				# Add element with highlight_index
-				if node.highlight_index is not None:
+				# Add element with highlight_index AND is interactive
+				if node.highlight_index is not None and node.is_interactive:
 					next_depth += 1
 
 					text = node.get_all_text_till_next_clickable_element()
@@ -262,6 +266,210 @@ class DOMElementNode(DOMBaseNode):
 
 					# makes sense to have if the website has lots of text -> so the LLM knows which things are part of the same clickable element and which are not
 					line += ' />'  # 1 token
+					formatted_text.append(line)
+
+				# Process children regardless
+				for child in node.children:
+					process_node(child, next_depth)
+
+			elif isinstance(node, DOMTextNode):
+				# Add text only if it doesn't have a highlighted parent
+				if node.has_parent_with_highlight_index():
+					return
+
+				if node.parent and node.parent.is_visible and node.parent.is_top_element:
+					formatted_text.append(f'{depth_str}{node.text}')
+
+		process_node(self, 0)
+		return '\n'.join(formatted_text)
+
+	@time_execution_sync('--interactive_elements_to_string')
+	def interactive_elements_to_string(self, include_attributes: list[str] | None = None) -> str:
+		"""Convert the processed DOM content to HTML, including both clickable and hoverable elements."""
+		formatted_text = []
+
+		if not include_attributes:
+			include_attributes = DEFAULT_INCLUDE_ATTRIBUTES
+
+		def process_node(node: DOMBaseNode, depth: int) -> None:
+			next_depth = int(depth)
+			depth_str = depth * '\t'
+
+			if isinstance(node, DOMElementNode):
+				# Add element with highlight_index OR if it's hoverable
+				if node.highlight_index is not None or node.is_hoverable:
+					next_depth += 1
+
+					text = node.get_all_text_till_next_clickable_element()
+					attributes_html_str = None
+					if include_attributes:
+						attributes_to_include = {
+							key: str(value).strip()
+							for key, value in node.attributes.items()
+							if key in include_attributes and str(value).strip() != ''
+						}
+
+						# Same optimization logic as clickable_elements_to_string
+						ordered_keys = [key for key in include_attributes if key in attributes_to_include]
+
+						if len(ordered_keys) > 1:
+							keys_to_remove = set()
+							seen_values = {}
+
+							for key in ordered_keys:
+								value = attributes_to_include[key]
+								if len(value) > 5:
+									if value in seen_values:
+										keys_to_remove.add(key)
+									else:
+										seen_values[value] = key
+
+							for key in keys_to_remove:
+								del attributes_to_include[key]
+
+						if node.tag_name == attributes_to_include.get('role'):
+							del attributes_to_include['role']
+
+						attrs_to_remove_if_text_matches = ['aria-label', 'placeholder', 'title']
+						for attr in attrs_to_remove_if_text_matches:
+							if (
+								attributes_to_include.get(attr)
+								and attributes_to_include.get(attr, '').strip().lower() == text.strip().lower()
+							):
+								del attributes_to_include[attr]
+
+						if attributes_to_include.items():
+							attributes_html_str = ' '.join(
+								f'{key}={cap_text_length(value, 15)}' for key, value in attributes_to_include.items()
+							)
+
+					# Build the line with element type indicator
+					if node.highlight_index is not None:
+						if node.is_new:
+							highlight_indicator = f'*[{node.highlight_index}]'
+						else:
+							highlight_indicator = f'[{node.highlight_index}]'
+					elif node.is_hoverable:
+						# Use a different indicator for hoverable-only elements
+						highlight_indicator = f'(H)'
+					
+					line = f'{depth_str}{highlight_indicator}<{node.tag_name}'
+
+					if attributes_html_str:
+						line += f' {attributes_html_str}'
+
+					if text:
+						text = text.strip()
+						if not attributes_html_str:
+							line += ' '
+						line += f'>{text}'
+
+					elif not attributes_html_str:
+						line += ' '
+
+					line += ' />'
+					formatted_text.append(line)
+
+				# Process children regardless
+				for child in node.children:
+					process_node(child, next_depth)
+
+			elif isinstance(node, DOMTextNode):
+				# Add text only if it doesn't have a highlighted parent
+				if node.has_parent_with_highlight_index():
+					return
+
+				if node.parent and node.parent.is_visible and node.parent.is_top_element:
+					formatted_text.append(f'{depth_str}{node.text}')
+
+		process_node(self, 0)
+		return '\n'.join(formatted_text)
+
+	@time_execution_sync('--hoverable_elements_to_string')
+	def hoverable_elements_to_string(self, include_attributes: list[str] | None = None) -> str:
+		"""Convert hoverable elements to string format."""
+		formatted_text = []
+
+		if not include_attributes:
+			include_attributes = DEFAULT_INCLUDE_ATTRIBUTES
+
+		def process_node(node: DOMBaseNode, depth: int) -> None:
+			next_depth = int(depth)
+			depth_str = depth * '\t'
+
+			if isinstance(node, DOMElementNode):
+				# Add element if it's hoverable (with or without highlight_index)
+				if node.is_hoverable:
+					next_depth += 1
+
+					text = node.get_all_text_till_next_clickable_element()
+					attributes_html_str = None
+					if include_attributes:
+						attributes_to_include = {
+							key: str(value).strip()
+							for key, value in node.attributes.items()
+							if key in include_attributes and str(value).strip() != ''
+						}
+
+						# Same optimization logic as other methods
+						ordered_keys = [key for key in include_attributes if key in attributes_to_include]
+
+						if len(ordered_keys) > 1:
+							keys_to_remove = set()
+							seen_values = {}
+
+							for key in ordered_keys:
+								value = attributes_to_include[key]
+								if len(value) > 5:
+									if value in seen_values:
+										keys_to_remove.add(key)
+									else:
+										seen_values[value] = key
+
+							for key in keys_to_remove:
+								del attributes_to_include[key]
+
+						if node.tag_name == attributes_to_include.get('role'):
+							del attributes_to_include['role']
+
+						attrs_to_remove_if_text_matches = ['aria-label', 'placeholder', 'title']
+						for attr in attrs_to_remove_if_text_matches:
+							if (
+								attributes_to_include.get(attr)
+								and attributes_to_include.get(attr, '').strip().lower() == text.strip().lower()
+							):
+								del attributes_to_include[attr]
+
+						if attributes_to_include.items():
+							attributes_html_str = ' '.join(
+								f'{key}={cap_text_length(value, 15)}' for key, value in attributes_to_include.items()
+							)
+
+					# Build the line with appropriate indicator
+					if node.highlight_index is not None:
+						if node.is_new:
+							highlight_indicator = f'*[{node.highlight_index}]'
+						else:
+							highlight_indicator = f'[{node.highlight_index}]'
+					else:
+						# Use (H) for hoverable elements without highlight index
+						highlight_indicator = f'(H)'
+					
+					line = f'{depth_str}{highlight_indicator}<{node.tag_name}'
+
+					if attributes_html_str:
+						line += f' {attributes_html_str}'
+
+					if text:
+						text = text.strip()
+						if not attributes_html_str:
+							line += ' '
+						line += f'>{text}'
+
+					elif not attributes_html_str:
+						line += ' '
+
+					line += ' />'
 					formatted_text.append(line)
 
 				# Process children regardless

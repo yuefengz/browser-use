@@ -948,6 +948,121 @@
   // }
 
   /**
+   * Checks if an element is hoverable (shows/hides content or changes appearance on hover).
+   * 
+   * @param {HTMLElement} element - The element to check.
+   * @returns {boolean} Whether the element has hover effects.
+   */
+  function isHoverableElement(element) {
+    if (!element || element.nodeType !== Node.ELEMENT_NODE) {
+      return false;
+    }
+
+    const tagName = element.tagName.toLowerCase();
+    const style = getCachedComputedStyle(element);
+
+    // 1. Check for CSS transitions/animations (common for hover effects)
+    if (style) {
+      const hasTransition = style.transitionProperty !== 'none' && style.transitionDuration !== '0s';
+      const hasAnimation = style.animationName !== 'none';
+      if (hasTransition || hasAnimation) {
+        return true;
+      }
+    }
+
+    // 2. Check for common dropdown/menu/tooltip patterns
+    const hoverableClasses = [
+      'dropdown', 'menu', 'tooltip', 'popover', 'nav', 'tab',
+      'accordion', 'collapse', 'hover', 'expandable'
+    ];
+    
+    const className = element.className.toLowerCase();
+    if (hoverableClasses.some(cls => className.includes(cls))) {
+      return true;
+    }
+
+    // 3. Check for hover-related attributes
+    const hoverableAttributes = [
+      'data-toggle', 'data-hover', 'data-tooltip', 'data-bs-toggle',
+      'aria-haspopup', 'aria-expanded', 'title'
+    ];
+    
+    if (hoverableAttributes.some(attr => element.hasAttribute(attr))) {
+      return true;
+    }
+
+    // 4. Check for navigation elements that commonly have hover effects
+    const hoverableElements = new Set([
+      'nav', 'menu', 'menuitem', 'details', 'summary'
+    ]);
+    
+    if (hoverableElements.has(tagName)) {
+      return true;
+    }
+
+    // 5. Check for ARIA roles that suggest hover behavior
+    const role = element.getAttribute('role');
+    const hoverableRoles = new Set([
+      'menu', 'menubar', 'menuitem', 'tab', 'tablist', 'dropdown',
+      'tooltip', 'popover', 'navigation'
+    ]);
+    
+    if (role && hoverableRoles.has(role)) {
+      return true;
+    }
+
+    // 6. Check for elements that commonly have :hover CSS rules
+    try {
+      // Parse CSS stylesheets to find :hover rules (when accessible)
+      for (const stylesheet of document.styleSheets) {
+        try {
+          for (const rule of stylesheet.cssRules || []) {
+            if (rule.selectorText && rule.selectorText.includes(':hover')) {
+              const baseSelector = rule.selectorText.replace(/:hover.*$/, '').trim();
+              try {
+                if (element.matches && element.matches(baseSelector)) {
+                  return true;
+                }
+              } catch (e) {
+                // Invalid selector, continue
+              }
+            }
+          }
+        } catch (e) {
+          // CORS or other access error, continue to next stylesheet
+        }
+      }
+    } catch (e) {
+      // Error accessing stylesheets, continue with other checks
+    }
+
+    // 7. Check for hover event listeners
+    try {
+      if (typeof getEventListeners === 'function') {
+        const listeners = getEventListeners(element);
+        const hoverEvents = ['mouseenter', 'mouseover', 'mouseleave', 'mouseout'];
+        for (const eventType of hoverEvents) {
+          if (listeners[eventType] && listeners[eventType].length > 0) {
+            return true;
+          }
+        }
+      }
+
+      // Check for inline hover handlers
+      const hoverHandlers = ['onmouseenter', 'onmouseover', 'onmouseleave', 'onmouseout'];
+      for (const handler of hoverHandlers) {
+        if (element.hasAttribute(handler) || typeof element[handler] === 'function') {
+          return true;
+        }
+      }
+    } catch (e) {
+      // Error checking event listeners, continue
+    }
+
+    return false;
+  }
+
+  /**
    * Checks if an element is an interactive candidate.
    *
    * @param {HTMLElement} element - The element to check.
@@ -1134,7 +1249,7 @@
    * @returns {boolean} Whether the element was highlighted.
    */
   function handleHighlighting(nodeData, node, parentIframe, isParentHighlighted) {
-    if (!nodeData.isInteractive) return false; // Not interactive, definitely don't highlight
+    if (!nodeData.isInteractive && !nodeData.isHoverable) return false; // Not interactive or hoverable, don't highlight
 
     let shouldHighlight = false;
     if (!isParentHighlighted) {
@@ -1316,8 +1431,12 @@
         const role = node.getAttribute('role');
         const isMenuContainer = role === 'menu' || role === 'menubar' || role === 'listbox';
         
-        if (nodeData.isTopElement || isMenuContainer) {
+        // Check if element might be hoverable to include it in processing
+        const mightBeHoverable = isHoverableElement(node);
+        
+        if (nodeData.isTopElement || isMenuContainer || mightBeHoverable) {
           nodeData.isInteractive = isInteractiveElement(node);
+          nodeData.isHoverable = mightBeHoverable; // Use cached result
           // Call the dedicated highlighting function
           nodeWasHighlighted = handleHighlighting(nodeData, node, parentIframe, isParentHighlighted);
         }

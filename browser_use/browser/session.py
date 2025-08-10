@@ -1799,6 +1799,35 @@ class BrowserSession(BaseModel):
 			# Any exception means the context is closed or invalid
 			return False
 
+	def _merge_hoverable_data(self, clickable_tree: DOMElementNode, hoverable_tree: DOMElementNode) -> None:
+		"""Merge hoverable information from the hoverable tree into the clickable tree."""
+		
+		def find_element_by_xpath(tree: DOMElementNode, xpath: str) -> DOMElementNode | None:
+			"""Find an element in the tree by its xpath."""
+			if tree.xpath == xpath:
+				return tree
+			for child in tree.children:
+				if isinstance(child, DOMElementNode):
+					result = find_element_by_xpath(child, xpath)
+					if result:
+						return result
+			return None
+		
+		def mark_hoverable_elements(hoverable_tree: DOMElementNode) -> None:
+			"""Traverse hoverable tree and mark corresponding elements in clickable tree."""
+			if hoverable_tree.is_hoverable:
+				# Find the corresponding element in the clickable tree
+				clickable_element = find_element_by_xpath(clickable_tree, hoverable_tree.xpath)
+				if clickable_element:
+					clickable_element.is_hoverable = True
+			
+			# Process children
+			for child in hoverable_tree.children:
+				if isinstance(child, DOMElementNode):
+					mark_hoverable_elements(child)
+		
+		mark_hoverable_elements(hoverable_tree)
+
 	def _reset_connection_state(self) -> None:
 		"""Reset the browser connection state when disconnection is detected"""
 
@@ -3349,14 +3378,30 @@ class BrowserSession(BaseModel):
 
 			dom_service = DomService(page, logger=self.logger)
 			try:
-				content = await asyncio.wait_for(
-					dom_service.get_clickable_elements(
-						focus_element=focus_element,
-						viewport_expansion=self.browser_profile.viewport_expansion,
-						highlight_elements=self.browser_profile.highlight_elements,
+				# Get both clickable and hoverable elements concurrently
+				clickable_content, hoverable_content = await asyncio.gather(
+					asyncio.wait_for(
+						dom_service.get_clickable_elements(
+							focus_element=focus_element,
+							viewport_expansion=self.browser_profile.viewport_expansion,
+							highlight_elements=self.browser_profile.highlight_elements,
+						),
+						timeout=45.0,
 					),
-					timeout=45.0,  # 45 second timeout for DOM processing - generous for complex pages
+					asyncio.wait_for(
+						dom_service.get_hoverable_elements(
+							highlight_elements=self.browser_profile.highlight_elements,
+							focus_element=focus_element,
+							viewport_expansion=self.browser_profile.viewport_expansion,
+						),
+						timeout=45.0,
+					)
 				)
+				
+				# Merge hoverable information into the clickable element tree
+				self._merge_hoverable_data(clickable_content.element_tree, hoverable_content.element_tree)
+				content = clickable_content  # Use the clickable content as the base
+				
 				self.logger.debug('✅ DOM processing completed')
 			except TimeoutError:
 				self.logger.warning(f'DOM processing timed out after 45 seconds for {page.url}')
