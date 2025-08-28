@@ -107,6 +107,7 @@ class MessageManager:
 		max_history_items: int | None = None,
 		vision_detail_level: Literal['auto', 'low', 'high'] = 'auto',
 		include_tool_call_examples: bool = False,
+		include_recent_events: bool = False,
 	):
 		self.task = task
 		self.state = state
@@ -117,6 +118,7 @@ class MessageManager:
 		self.max_history_items = max_history_items
 		self.vision_detail_level = vision_detail_level
 		self.include_tool_call_examples = include_tool_call_examples
+		self.include_recent_events = include_recent_events
 
 		assert max_history_items is None or max_history_items > 5, 'max_history_items must be None or greater than 5'
 
@@ -178,9 +180,13 @@ class MessageManager:
 
 		action_results = ''
 		result_len = len(result)
+		read_state_idx = 0
 		for idx, action_result in enumerate(result):
 			if action_result.include_extracted_content_only_once and action_result.extracted_content:
-				self.state.read_state_description += action_result.extracted_content + '\n'
+				self.state.read_state_description += (
+					f'<read_state_{read_state_idx}>\n{action_result.extracted_content}\n</read_state_{read_state_idx}>\n'
+				)
+				read_state_idx += 1
 				logger.debug(f'Added extracted_content to read_state_description: {action_result.extracted_content}')
 
 			if action_result.long_term_memory:
@@ -197,6 +203,8 @@ class MessageManager:
 					error_text = action_result.error
 				action_results += f'Action {idx + 1}/{result_len}: {error_text}\n'
 				logger.debug(f'Added error to action_results: {error_text}')
+
+		self.state.read_state_description = self.state.read_state_description.strip('\n')
 
 		if action_results:
 			action_results = f'Action Results:\n{action_results}'
@@ -229,7 +237,7 @@ class MessageManager:
 		for key, value in sensitive_data.items():
 			if isinstance(value, dict):
 				# New format: {domain: {key: value}}
-				if match_url_with_domain_pattern(current_page_url, key, True):
+				if current_page_url and match_url_with_domain_pattern(current_page_url, key, True):
 					placeholders.update(value.keys())
 			else:
 				# Old format: {key: value}
@@ -263,7 +271,12 @@ class MessageManager:
 
 		# First, update the agent history items with the latest step results
 		self._update_agent_history_description(model_output, result, step_info)
-		if sensitive_data:
+
+		# Use the passed sensitive_data parameter, falling back to instance variable
+		effective_sensitive_data = sensitive_data if sensitive_data is not None else self.sensitive_data
+		if effective_sensitive_data is not None:
+			# Update instance variable to keep it in sync
+			self.sensitive_data = effective_sensitive_data
 			self.sensitive_data_description = self._get_sensitive_data_description(browser_state_summary.url)
 
 		# Use only the current screenshot
@@ -286,6 +299,7 @@ class MessageManager:
 			available_file_paths=available_file_paths,
 			screenshots=screenshots,
 			vision_detail_level=self.vision_detail_level,
+			include_recent_events=self.include_recent_events,
 		).get_user_message(use_vision)
 
 		# Set the state message with caching enabled
