@@ -17,39 +17,41 @@ from browser_use.dom.views import EnhancedDOMTreeNode
 
 
 class ElementSelectedEvent(BaseEvent[T_EventResultType]):
-	"""An element was selected."""
+    """An element was selected."""
 
-	node: EnhancedDOMTreeNode
+    node: EnhancedDOMTreeNode
 
-	@field_validator('node', mode='before')
-	@classmethod
-	def serialize_node(cls, data: EnhancedDOMTreeNode | None) -> EnhancedDOMTreeNode | None:
-		if data is None:
-			return None
-		return EnhancedDOMTreeNode(
-			element_index=data.element_index,
-			node_id=data.node_id,
-			backend_node_id=data.backend_node_id,
-			session_id=data.session_id,
-			frame_id=data.frame_id,
-			target_id=data.target_id,
-			node_type=data.node_type,
-			node_name=data.node_name,
-			node_value=data.node_value,
-			attributes=data.attributes,
-			is_scrollable=data.is_scrollable,
-			is_visible=data.is_visible,
-			absolute_position=data.absolute_position,
-			# override the circular reference fields in EnhancedDOMTreeNode as they cant be serialized and aren't needed by event handlers
-			# only used internally by the DOM service during DOM tree building process, not intended public API use
-			content_document=None,
-			shadow_root_type=None,
-			shadow_roots=[],
-			parent_node=None,
-			children_nodes=[],
-			ax_node=None,
-			snapshot_node=None,
-		)
+    @field_validator("node", mode="before")
+    @classmethod
+    def serialize_node(
+        cls, data: EnhancedDOMTreeNode | None
+    ) -> EnhancedDOMTreeNode | None:
+        if data is None:
+            return None
+        return EnhancedDOMTreeNode(
+            element_index=data.element_index,
+            node_id=data.node_id,
+            backend_node_id=data.backend_node_id,
+            session_id=data.session_id,
+            frame_id=data.frame_id,
+            target_id=data.target_id,
+            node_type=data.node_type,
+            node_name=data.node_name,
+            node_value=data.node_value,
+            attributes=data.attributes,
+            is_scrollable=data.is_scrollable,
+            is_visible=data.is_visible,
+            absolute_position=data.absolute_position,
+            # override the circular reference fields in EnhancedDOMTreeNode as they cant be serialized and aren't needed by event handlers
+            # only used internally by the DOM service during DOM tree building process, not intended public API use
+            content_document=None,
+            shadow_root_type=None,
+            shadow_roots=[],
+            parent_node=None,
+            children_nodes=[],
+            ax_node=None,
+            snapshot_node=None,
+        )
 
 
 # TODO: add page handle to events
@@ -77,89 +79,92 @@ class ElementSelectedEvent(BaseEvent[T_EventResultType]):
 
 
 class NavigateToUrlEvent(BaseEvent[None]):
-	"""Navigate to a specific URL."""
+    """Navigate to a specific URL."""
 
-	url: str
-	wait_until: Literal['load', 'domcontentloaded', 'networkidle', 'commit'] = 'load'
-	timeout_ms: int | None = None
-	new_tab: bool = Field(
-		default=False, description='Set True to leave the current tab alone and open a new tab in the foreground for the new URL'
-	)
-	# existing_tab: PageHandle | None = None  # TODO
+    url: str
+    wait_until: Literal["load", "domcontentloaded", "networkidle", "commit"] = "load"
+    timeout_ms: int | None = None
+    new_tab: bool = Field(
+        default=False,
+        description="Set True to leave the current tab alone and open a new tab in the foreground for the new URL",
+    )
+    # existing_tab: PageHandle | None = None  # TODO
 
-	# time limits enforced by bubus, not exposed to LLM:
-	event_timeout: float | None = 15.0  # seconds
+    # time limits enforced by bubus, not exposed to LLM:
+    event_timeout: float | None = 15.0  # seconds
 
 
 class ClickElementEvent(ElementSelectedEvent[dict[str, Any] | None]):
-	"""Click an element."""
+    """Click an element."""
 
-	node: 'EnhancedDOMTreeNode'
-	button: Literal['left', 'right', 'middle'] = 'left'
-	while_holding_ctrl: bool = Field(
-		default=False,
-		description='Set True to open any link clicked in a new tab in the background, can use switch_tab(tab_id=None) after to focus it',
-	)
-	# click_count: int = 1           # TODO
-	# expect_download: bool = False  # moved to downloads_watchdog.py
+    node: "EnhancedDOMTreeNode"
+    button: Literal["left", "right", "middle"] = "left"
+    while_holding_ctrl: bool = Field(
+        default=False,
+        description="Set True to open any link clicked in a new tab in the background, can use switch_tab(tab_id=None) after to focus it",
+    )
+    # click_count: int = 1           # TODO
+    # expect_download: bool = False  # moved to downloads_watchdog.py
 
-	event_timeout: float | None = 15.0  # seconds
+    event_timeout: float | None = 15.0  # seconds
 
 
 class TypeTextEvent(ElementSelectedEvent[dict | None]):
-	"""Type text into an element."""
+    """Type text into an element."""
 
-	node: 'EnhancedDOMTreeNode'
-	text: str
-	clear_existing: bool = True
+    node: "EnhancedDOMTreeNode"
+    text: str
+    clear_existing: bool = True
 
-	event_timeout: float | None = 15.0  # seconds
+    event_timeout: float | None = 15.0  # seconds
 
 
 class ScrollEvent(ElementSelectedEvent[None]):
-	"""Scroll the page or element."""
+    """Scroll the page or element."""
 
-	direction: Literal['up', 'down', 'left', 'right']
-	amount: int  # pixels
-	node: 'EnhancedDOMTreeNode | None' = None  # None means scroll page
+    direction: Literal["up", "down", "left", "right"]
+    amount: int  # pixels
+    node: "EnhancedDOMTreeNode | None" = None  # None means scroll page
 
-	event_timeout: float | None = 8.0  # seconds
+    event_timeout: float | None = 8.0  # seconds
 
 
 class SwitchTabEvent(BaseEvent[TargetID]):
-	"""Switch to a different tab."""
+    """Switch to a different tab."""
 
-	target_id: TargetID | None = Field(default=None, description='None means switch to the most recently opened tab')
+    target_id: TargetID | None = Field(
+        default=None, description="None means switch to the most recently opened tab"
+    )
 
-	event_timeout: float | None = 10.0  # seconds
+    event_timeout: float | None = 10.0  # seconds
 
 
 class CloseTabEvent(BaseEvent[None]):
-	"""Close a tab."""
+    """Close a tab."""
 
-	target_id: TargetID
+    target_id: TargetID
 
-	event_timeout: float | None = 10.0  # seconds
+    event_timeout: float | None = 10.0  # seconds
 
 
 class ScreenshotEvent(BaseEvent[str]):
-	"""Request to take a screenshot."""
+    """Request to take a screenshot."""
 
-	full_page: bool = False
-	clip: dict[str, float] | None = None  # {x, y, width, height}
+    full_page: bool = False
+    clip: dict[str, float] | None = None  # {x, y, width, height}
 
-	event_timeout: float | None = 8.0  # seconds
+    event_timeout: float | None = 8.0  # seconds
 
 
 class BrowserStateRequestEvent(BaseEvent[BrowserStateSummary]):
-	"""Request current browser state."""
+    """Request current browser state."""
 
-	include_dom: bool = True
-	include_screenshot: bool = True
-	cache_clickable_elements_hashes: bool = True
-	include_recent_events: bool = False
+    include_dom: bool = True
+    include_screenshot: bool = True
+    cache_clickable_elements_hashes: bool = True
+    include_recent_events: bool = False
 
-	event_timeout: float | None = 30.0  # seconds
+    event_timeout: float | None = 300.0  # seconds
 
 
 # class WaitForConditionEvent(BaseEvent):
@@ -172,120 +177,120 @@ class BrowserStateRequestEvent(BaseEvent[BrowserStateSummary]):
 
 
 class GoBackEvent(BaseEvent[None]):
-	"""Navigate back in browser history."""
+    """Navigate back in browser history."""
 
-	event_timeout: float | None = 15.0  # seconds
+    event_timeout: float | None = 15.0  # seconds
 
 
 class GoForwardEvent(BaseEvent[None]):
-	"""Navigate forward in browser history."""
+    """Navigate forward in browser history."""
 
-	event_timeout: float | None = 15.0  # seconds
+    event_timeout: float | None = 15.0  # seconds
 
 
 class RefreshEvent(BaseEvent[None]):
-	"""Refresh/reload the current page."""
+    """Refresh/reload the current page."""
 
-	event_timeout: float | None = 15.0  # seconds
+    event_timeout: float | None = 15.0  # seconds
 
 
 class WaitEvent(BaseEvent[None]):
-	"""Wait for a specified number of seconds."""
+    """Wait for a specified number of seconds."""
 
-	seconds: float = 3.0
-	max_seconds: float = 10.0  # Safety cap
+    seconds: float = 3.0
+    max_seconds: float = 10.0  # Safety cap
 
-	event_timeout: float | None = 60.0  # seconds
+    event_timeout: float | None = 60.0  # seconds
 
 
 class SendKeysEvent(BaseEvent[None]):
-	"""Send keyboard keys/shortcuts."""
+    """Send keyboard keys/shortcuts."""
 
-	keys: str  # e.g., "ctrl+a", "cmd+c", "Enter"
+    keys: str  # e.g., "ctrl+a", "cmd+c", "Enter"
 
-	event_timeout: float | None = 15.0  # seconds
+    event_timeout: float | None = 15.0  # seconds
 
 
 class UploadFileEvent(ElementSelectedEvent[None]):
-	"""Upload a file to an element."""
+    """Upload a file to an element."""
 
-	node: 'EnhancedDOMTreeNode'
-	file_path: str
+    node: "EnhancedDOMTreeNode"
+    file_path: str
 
-	event_timeout: float | None = 30.0  # seconds
+    event_timeout: float | None = 30.0  # seconds
 
 
 class GetDropdownOptionsEvent(ElementSelectedEvent[dict[str, str]]):
-	"""Get all options from any dropdown (native <select>, ARIA menus, or custom dropdowns).
+    """Get all options from any dropdown (native <select>, ARIA menus, or custom dropdowns).
 
-	Returns a dict containing dropdown type, options list, and element metadata."""
+    Returns a dict containing dropdown type, options list, and element metadata."""
 
-	node: 'EnhancedDOMTreeNode'
+    node: "EnhancedDOMTreeNode"
 
-	event_timeout: float | None = (
-		15.0  # some dropdowns lazy-load the list of options on first interaction, so we need to wait for them to load (e.g. table filter lists can have thousands of options)
-	)
+    event_timeout: float | None = (
+        15.0  # some dropdowns lazy-load the list of options on first interaction, so we need to wait for them to load (e.g. table filter lists can have thousands of options)
+    )
 
 
 class SelectDropdownOptionEvent(ElementSelectedEvent[dict[str, str]]):
-	"""Select a dropdown option by exact text from any dropdown type.
+    """Select a dropdown option by exact text from any dropdown type.
 
-	Returns a dict containing success status and selection details."""
+    Returns a dict containing success status and selection details."""
 
-	node: 'EnhancedDOMTreeNode'
-	text: str  # The option text to select
+    node: "EnhancedDOMTreeNode"
+    text: str  # The option text to select
 
-	event_timeout: float | None = 8.0  # seconds
+    event_timeout: float | None = 8.0  # seconds
 
 
 class ScrollToTextEvent(BaseEvent[None]):
-	"""Scroll to specific text on the page. Raises exception if text not found."""
+    """Scroll to specific text on the page. Raises exception if text not found."""
 
-	text: str
-	direction: Literal['up', 'down'] = 'down'
+    text: str
+    direction: Literal["up", "down"] = "down"
 
-	event_timeout: float | None = 15.0  # seconds
+    event_timeout: float | None = 15.0  # seconds
 
 
 # ============================================================================
 
 
 class BrowserStartEvent(BaseEvent):
-	"""Start/connect to browser."""
+    """Start/connect to browser."""
 
-	cdp_url: str | None = None
-	launch_options: dict[str, Any] = Field(default_factory=dict)
+    cdp_url: str | None = None
+    launch_options: dict[str, Any] = Field(default_factory=dict)
 
-	event_timeout: float | None = 30.0  # seconds
+    event_timeout: float | None = 30.0  # seconds
 
 
 class BrowserStopEvent(BaseEvent):
-	"""Stop/disconnect from browser."""
+    """Stop/disconnect from browser."""
 
-	force: bool = False
+    force: bool = False
 
-	event_timeout: float | None = 45.0  # seconds
+    event_timeout: float | None = 45.0  # seconds
 
 
 class BrowserLaunchResult(BaseModel):
-	"""Result of launching a browser."""
+    """Result of launching a browser."""
 
-	# TODO: add browser executable_path, pid, version, latency, user_data_dir, X11 $DISPLAY, host IP address, etc.
-	cdp_url: str
+    # TODO: add browser executable_path, pid, version, latency, user_data_dir, X11 $DISPLAY, host IP address, etc.
+    cdp_url: str
 
 
 class BrowserLaunchEvent(BaseEvent[BrowserLaunchResult]):
-	"""Launch a local browser process."""
+    """Launch a local browser process."""
 
-	# TODO: add executable_path, proxy settings, preferences, extra launch args, etc.
+    # TODO: add executable_path, proxy settings, preferences, extra launch args, etc.
 
-	event_timeout: float | None = 30.0  # seconds
+    event_timeout: float | None = 30.0  # seconds
 
 
 class BrowserKillEvent(BaseEvent):
-	"""Kill local browser subprocess."""
+    """Kill local browser subprocess."""
 
-	event_timeout: float | None = 30.0  # seconds
+    event_timeout: float | None = 30.0  # seconds
 
 
 # TODO: replace all Runtime.evaluate() calls with this event
@@ -334,40 +339,40 @@ class BrowserKillEvent(BaseEvent):
 
 
 class BrowserConnectedEvent(BaseEvent):
-	"""Browser has started/connected."""
+    """Browser has started/connected."""
 
-	cdp_url: str
+    cdp_url: str
 
-	event_timeout: float | None = 30.0  # seconds
+    event_timeout: float | None = 30.0  # seconds
 
 
 class BrowserStoppedEvent(BaseEvent):
-	"""Browser has stopped/disconnected."""
+    """Browser has stopped/disconnected."""
 
-	reason: str | None = None
+    reason: str | None = None
 
-	event_timeout: float | None = 30.0  # seconds
+    event_timeout: float | None = 30.0  # seconds
 
 
 class TabCreatedEvent(BaseEvent):
-	"""A new tab was created."""
+    """A new tab was created."""
 
-	target_id: TargetID
-	url: str
+    target_id: TargetID
+    url: str
 
-	event_timeout: float | None = 30.0  # seconds
+    event_timeout: float | None = 30.0  # seconds
 
 
 class TabClosedEvent(BaseEvent):
-	"""A tab was closed."""
+    """A tab was closed."""
 
-	target_id: TargetID
+    target_id: TargetID
 
-	# TODO:
-	# new_focus_target_id: int | None = None
-	# new_focus_url: str | None = None
+    # TODO:
+    # new_focus_target_id: int | None = None
+    # new_focus_url: str | None = None
 
-	event_timeout: float | None = 10.0  # seconds
+    event_timeout: float | None = 10.0  # seconds
 
 
 # TODO: emit this when DOM changes significantly, inner frame navigates, form submits, history.pushState(), etc.
@@ -379,42 +384,44 @@ class TabClosedEvent(BaseEvent):
 
 
 class AgentFocusChangedEvent(BaseEvent):
-	"""Agent focus changed to a different tab."""
+    """Agent focus changed to a different tab."""
 
-	target_id: TargetID
-	url: str
+    target_id: TargetID
+    url: str
 
-	event_timeout: float | None = 10.0  # seconds
+    event_timeout: float | None = 10.0  # seconds
 
 
 class TargetCrashedEvent(BaseEvent):
-	"""A target has crashed."""
+    """A target has crashed."""
 
-	target_id: TargetID
-	error: str
+    target_id: TargetID
+    error: str
 
-	event_timeout: float | None = 10.0  # seconds
+    event_timeout: float | None = 10.0  # seconds
 
 
 class NavigationStartedEvent(BaseEvent):
-	"""Navigation started."""
+    """Navigation started."""
 
-	target_id: TargetID
-	url: str
+    target_id: TargetID
+    url: str
 
-	event_timeout: float | None = 30.0  # seconds
+    event_timeout: float | None = 30.0  # seconds
 
 
 class NavigationCompleteEvent(BaseEvent):
-	"""Navigation completed."""
+    """Navigation completed."""
 
-	target_id: TargetID
-	url: str
-	status: int | None = None
-	error_message: str | None = None  # Error/timeout message if navigation had issues
-	loading_status: str | None = None  # Detailed loading status (e.g., network timeout info)
+    target_id: TargetID
+    url: str
+    status: int | None = None
+    error_message: str | None = None  # Error/timeout message if navigation had issues
+    loading_status: str | None = (
+        None  # Detailed loading status (e.g., network timeout info)
+    )
 
-	event_timeout: float | None = 30.0  # seconds
+    event_timeout: float | None = 30.0  # seconds
 
 
 # ============================================================================
@@ -423,13 +430,13 @@ class NavigationCompleteEvent(BaseEvent):
 
 
 class BrowserErrorEvent(BaseEvent):
-	"""An error occurred in the browser layer."""
+    """An error occurred in the browser layer."""
 
-	error_type: str
-	message: str
-	details: dict[str, Any] = Field(default_factory=dict)
+    error_type: str
+    message: str
+    details: dict[str, Any] = Field(default_factory=dict)
 
-	event_timeout: float | None = 30.0  # seconds
+    event_timeout: float | None = 30.0  # seconds
 
 
 # ============================================================================
@@ -438,29 +445,29 @@ class BrowserErrorEvent(BaseEvent):
 
 
 class SaveStorageStateEvent(BaseEvent):
-	"""Request to save browser storage state."""
+    """Request to save browser storage state."""
 
-	path: str | None = None  # Optional path, uses profile default if not provided
+    path: str | None = None  # Optional path, uses profile default if not provided
 
-	event_timeout: float | None = 45.0  # seconds
+    event_timeout: float | None = 45.0  # seconds
 
 
 class StorageStateSavedEvent(BaseEvent):
-	"""Notification that storage state was saved."""
+    """Notification that storage state was saved."""
 
-	path: str
-	cookies_count: int
-	origins_count: int
+    path: str
+    cookies_count: int
+    origins_count: int
 
-	event_timeout: float | None = 30.0  # seconds
+    event_timeout: float | None = 30.0  # seconds
 
 
 class LoadStorageStateEvent(BaseEvent):
-	"""Request to load browser storage state."""
+    """Request to load browser storage state."""
 
-	path: str | None = None  # Optional path, uses profile default if not provided
+    path: str | None = None  # Optional path, uses profile default if not provided
 
-	event_timeout: float | None = 45.0  # seconds
+    event_timeout: float | None = 45.0  # seconds
 
 
 # TODO: refactor this to:
@@ -468,13 +475,13 @@ class LoadStorageStateEvent(BaseEvent):
 # - on_BrowserStopEvent() -> dispatch(SaveStorageStateEvent()) -> _copy_storage_state_from_browser_to_json(new_cdp_session, json_file)
 # and get rid of StorageStateSavedEvent and StorageStateLoadedEvent, have the original events + provide handler return values for any results
 class StorageStateLoadedEvent(BaseEvent):
-	"""Notification that storage state was loaded."""
+    """Notification that storage state was loaded."""
 
-	path: str
-	cookies_count: int
-	origins_count: int
+    path: str
+    cookies_count: int
+    origins_count: int
 
-	event_timeout: float | None = 30.0  # seconds
+    event_timeout: float | None = 30.0  # seconds
 
 
 # ============================================================================
@@ -483,35 +490,37 @@ class StorageStateLoadedEvent(BaseEvent):
 
 
 class FileDownloadedEvent(BaseEvent):
-	"""A file has been downloaded."""
+    """A file has been downloaded."""
 
-	url: str
-	path: str
-	file_name: str
-	file_size: int
-	file_type: str | None = None  # e.g., 'pdf', 'zip', 'docx', etc.
-	mime_type: str | None = None  # e.g., 'application/pdf'
-	from_cache: bool = False
-	auto_download: bool = False  # Whether this was an automatic download (e.g., PDF auto-download)
+    url: str
+    path: str
+    file_name: str
+    file_size: int
+    file_type: str | None = None  # e.g., 'pdf', 'zip', 'docx', etc.
+    mime_type: str | None = None  # e.g., 'application/pdf'
+    from_cache: bool = False
+    auto_download: bool = (
+        False  # Whether this was an automatic download (e.g., PDF auto-download)
+    )
 
-	event_timeout: float | None = 30.0  # seconds
+    event_timeout: float | None = 30.0  # seconds
 
 
 class AboutBlankDVDScreensaverShownEvent(BaseEvent):
-	"""AboutBlankWatchdog has shown DVD screensaver animation on an about:blank tab."""
+    """AboutBlankWatchdog has shown DVD screensaver animation on an about:blank tab."""
 
-	target_id: TargetID
-	error: str | None = None
+    target_id: TargetID
+    error: str | None = None
 
 
 class DialogOpenedEvent(BaseEvent):
-	"""Event dispatched when a JavaScript dialog is opened and handled."""
+    """Event dispatched when a JavaScript dialog is opened and handled."""
 
-	dialog_type: str  # 'alert', 'confirm', 'prompt', or 'beforeunload'
-	message: str
-	url: str
-	frame_id: str
-	# target_id: TargetID   # TODO: add this to avoid needing target_id_from_frame() later
+    dialog_type: str  # 'alert', 'confirm', 'prompt', or 'beforeunload'
+    message: str
+    url: str
+    frame_id: str
+    # target_id: TargetID   # TODO: add this to avoid needing target_id_from_frame() later
 
 
 # Note: Model rebuilding for forward references is handled in the importing modules
@@ -520,25 +529,27 @@ class DialogOpenedEvent(BaseEvent):
 
 
 def _check_event_names_dont_overlap():
-	"""
-	check that event names defined in this file are valid and non-overlapping
-	(naiively n^2 so it's pretty slow but ok for now, optimize when >20 events)
-	"""
-	event_names = {
-		name.split('[')[0]
-		for name in globals().keys()
-		if not name.startswith('_')
-		and inspect.isclass(globals()[name])
-		and issubclass(globals()[name], BaseEvent)
-		and name != 'BaseEvent'
-	}
-	for name_a in event_names:
-		assert name_a.endswith('Event'), f'Event with name {name_a} does not end with "Event"'
-		for name_b in event_names:
-			if name_a != name_b:  # Skip self-comparison
-				assert name_a not in name_b, (
-					f'Event with name {name_a} is a substring of {name_b}, all events must be completely unique to avoid find-and-replace accidents'
-				)
+    """
+    check that event names defined in this file are valid and non-overlapping
+    (naiively n^2 so it's pretty slow but ok for now, optimize when >20 events)
+    """
+    event_names = {
+        name.split("[")[0]
+        for name in globals().keys()
+        if not name.startswith("_")
+        and inspect.isclass(globals()[name])
+        and issubclass(globals()[name], BaseEvent)
+        and name != "BaseEvent"
+    }
+    for name_a in event_names:
+        assert name_a.endswith(
+            "Event"
+        ), f'Event with name {name_a} does not end with "Event"'
+        for name_b in event_names:
+            if name_a != name_b:  # Skip self-comparison
+                assert (
+                    name_a not in name_b
+                ), f"Event with name {name_a} is a substring of {name_b}, all events must be completely unique to avoid find-and-replace accidents"
 
 
 # overlapping event names are a nightmare to trace and rename later, dont do it!
