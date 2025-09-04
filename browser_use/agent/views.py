@@ -376,6 +376,10 @@ class AgentHistoryList(BaseModel, Generic[AgentStructuredOutput]):
 		"""Load history from JSON file"""
 		with open(filepath, encoding='utf-8') as f:
 			data = json.load(f)
+		
+		# Migrate legacy format if needed
+		data = cls._migrate_legacy_format(data)
+		
 		# loop through history and validate output_model actions to enrich with custom actions
 		for h in data['history']:
 			if h['model_output']:
@@ -387,6 +391,72 @@ class AgentHistoryList(BaseModel, Generic[AgentStructuredOutput]):
 				h['state']['interacted_element'] = None
 		history = cls.model_validate(data)
 		return history
+	
+	@classmethod
+	def _migrate_legacy_format(cls, data: dict) -> dict:
+		"""Migrate legacy format to current format"""
+		if 'history' not in data:
+			return data
+			
+		for h in data['history']:
+			if 'state' not in h:
+				continue
+				
+			state = h['state']
+			
+			# Migrate tab format: page_id/parent_page_id -> tab_id/parent_tab_id
+			if 'tabs' in state:
+				for tab in state['tabs']:
+					if 'page_id' in tab and 'tab_id' not in tab:
+						# Convert page_id to a 4-character tab_id (legacy format compatibility)
+						page_id = tab.pop('page_id')
+						tab['tab_id'] = f"{page_id:04d}"  # Zero-pad to 4 characters
+					
+					if 'parent_page_id' in tab and 'parent_tab_id' not in tab:
+						parent_page_id = tab.pop('parent_page_id')
+						if parent_page_id is not None:
+							tab['parent_tab_id'] = f"{parent_page_id:04d}"
+						else:
+							tab['parent_tab_id'] = None
+			
+			# Migrate interacted_element format
+			if 'interacted_element' in state:
+				interacted_elements = state['interacted_element']
+				if isinstance(interacted_elements, list):
+					for i, element in enumerate(interacted_elements):
+						if element is not None and isinstance(element, dict):
+							# Check if this is legacy format (missing required fields)
+							required_fields = ['node_id', 'backend_node_id', 'frame_id', 'node_type', 'node_value', 'node_name', 'bounds', 'x_path', 'element_hash']
+							missing_fields = [field for field in required_fields if field not in element]
+							
+							if missing_fields:
+								# This is legacy format, add default values for missing fields
+								if 'node_id' not in element:
+									element['node_id'] = 0
+								if 'backend_node_id' not in element:
+									element['backend_node_id'] = 0
+								if 'frame_id' not in element:
+									element['frame_id'] = None
+								if 'node_type' not in element:
+									element['node_type'] = 1  # ELEMENT_NODE
+								if 'node_value' not in element:
+									element['node_value'] = ""
+								if 'node_name' not in element:
+									element['node_name'] = element.get('tag_name', 'div').upper()
+								if 'bounds' not in element:
+									element['bounds'] = None
+								if 'x_path' not in element and 'xpath' in element:
+									element['x_path'] = element['xpath']
+								elif 'x_path' not in element:
+									element['x_path'] = ""
+								if 'element_hash' not in element:
+									element['element_hash'] = hash(element.get('xpath', '') + element.get('tag_name', ''))
+								
+								# Clean up legacy fields that might cause conflicts
+								if 'xpath' in element and 'x_path' in element:
+									del element['xpath']
+		
+		return data
 
 	def last_action(self) -> None | dict:
 		"""Last action in history"""
