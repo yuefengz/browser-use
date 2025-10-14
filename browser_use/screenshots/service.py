@@ -32,6 +32,19 @@ class ScreenshotService:
 
 		return str(screenshot_path)
 
+	async def store_clean_screenshot(self, screenshot_b64: str, step_number: int) -> str:
+		"""Store a clean (pre-highlight) screenshot to disk and return the full path as string"""
+		screenshot_filename = f'step_{step_number}_clean.png'
+		screenshot_path = self.screenshots_dir / screenshot_filename
+
+		# Decode base64 and save to disk
+		screenshot_data = base64.b64decode(screenshot_b64)
+
+		async with await anyio.open_file(screenshot_path, 'wb') as f:
+			await f.write(screenshot_data)
+
+		return str(screenshot_path)
+
 	async def get_screenshot(self, screenshot_path: str) -> str | None:
 		"""Load screenshot from disk path and return as base64"""
 		if not screenshot_path:

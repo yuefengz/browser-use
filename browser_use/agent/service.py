@@ -961,6 +961,7 @@ class Agent(Generic[Context, AgentStructuredOutput]):
 
 		# Store screenshot and get path
 		screenshot_path = None
+		clean_screenshot_path = None
 		if browser_state_summary.screenshot:
 			self.logger.debug(
 				f'📸 Storing screenshot for step {self.state.n_steps}, screenshot length: {len(browser_state_summary.screenshot)}'
@@ -970,12 +971,21 @@ class Agent(Generic[Context, AgentStructuredOutput]):
 		else:
 			self.logger.debug(f'📸 No screenshot in browser_state_summary for step {self.state.n_steps}')
 
+		# Store clean screenshot if available
+		if browser_state_summary.clean_screenshot:
+			self.logger.debug(f'📸 Storing clean screenshot for step {self.state.n_steps}, screenshot length: {len(browser_state_summary.clean_screenshot)}')
+			clean_screenshot_path = await self.screenshot_service.store_clean_screenshot(browser_state_summary.clean_screenshot, self.state.n_steps)
+			self.logger.debug(f'📸 Clean screenshot stored at: {clean_screenshot_path}')
+		else:
+			self.logger.debug(f'📸 No clean screenshot in browser_state_summary for step {self.state.n_steps}')
+
 		state_history = BrowserStateHistory(
 			url=browser_state_summary.url,
 			title=browser_state_summary.title,
 			tabs=browser_state_summary.tabs,
 			interacted_element=interacted_elements,
 			screenshot_path=screenshot_path,
+			clean_screenshot_path=clean_screenshot_path,
 		)
 
 		history_item = AgentHistory(
