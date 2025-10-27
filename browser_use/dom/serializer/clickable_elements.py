@@ -34,6 +34,11 @@ class ClickableElementDetector:
 
 		# SEARCH ELEMENT DETECTION: Check for search-related classes and attributes
 		if node.attributes:
+			# HACK: Treat specific app list items as clickable by class name
+			class_attr = node.attributes.get('class', '')
+			if isinstance(class_attr, str) and 'form-template-list-item' in class_attr.lower():
+				return True
+
 			search_indicators = {
 				'search',
 				'magnify',
