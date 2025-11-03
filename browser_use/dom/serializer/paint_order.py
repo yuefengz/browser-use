@@ -209,8 +209,7 @@ class PaintOrderRemover:
 				if rect is None or rect.area() == 0:
 					continue  # no effective painted area
 
-				covered = rect_union.contains(rect)
-				if covered:
+				if rect_union.contains(rect):
 					node.ignored_by_paint_order = True
 
 				# don't add to the nodes if opacity is less then 0.95 or background-color is transparent
