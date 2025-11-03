@@ -139,7 +139,11 @@ class PaintOrderRemover:
 	def calculate_paint_order(self) -> None:
 		all_simplified_nodes_with_paint_order: list[SimplifiedNode] = []
 
-		def collect_paint_order(node: SimplifiedNode) -> None:
+		# Track parent relationships to compute effective (clipped) rects
+		parent_map: dict[int, SimplifiedNode | None] = {}
+
+		def collect_paint_order(node: SimplifiedNode, parent: SimplifiedNode | None = None) -> None:
+			parent_map[id(node)] = parent
 			if (
 				node.original_node.snapshot_node
 				and node.original_node.snapshot_node.paint_order is not None
@@ -148,9 +152,9 @@ class PaintOrderRemover:
 				all_simplified_nodes_with_paint_order.append(node)
 
 			for child in node.children:
-				collect_paint_order(child)
+				collect_paint_order(child, node)
 
-		collect_paint_order(self.root)
+		collect_paint_order(self.root, None)
 
 		grouped_by_paint_order: defaultdict[int, list[SimplifiedNode]] = defaultdict(list)
 
@@ -160,19 +164,50 @@ class PaintOrderRemover:
 
 		rect_union = RectUnionPure()
 
+		def _rect_from_node(n: SimplifiedNode) -> Rect | None:
+			if not n.original_node.snapshot_node or not n.original_node.snapshot_node.bounds:
+				return None
+			b = n.original_node.snapshot_node.bounds
+			x1 = b.x
+			y1 = b.y
+			x2 = b.x + b.width
+			y2 = b.y + b.height
+			if x2 < x1 or y2 < y1:
+				return None
+			return Rect(x1=x1, y1=y1, x2=x2, y2=y2)
+
+		def _intersect(a: Rect, b: Rect) -> Rect | None:
+			x1 = max(a.x1, b.x1)
+			y1 = max(a.y1, b.y1)
+			x2 = min(a.x2, b.x2)
+			y2 = min(a.y2, b.y2)
+			if x2 < x1 or y2 < y1:
+				return None
+			return Rect(x1=x1, y1=y1, x2=x2, y2=y2)
+
+		def _effective_rect(node: SimplifiedNode) -> Rect | None:
+			"""Clamp node's rect by all ancestor rects that have bounds (approximates clipping)."""
+			base = _rect_from_node(node)
+			if base is None:
+				return None
+			current = parent_map.get(id(node))
+			eff = base
+			while current is not None:
+				parent_rect = _rect_from_node(current)
+				if parent_rect is not None:
+					eff = _intersect(eff, parent_rect)
+					if eff is None:
+						return None
+				current = parent_map.get(id(current))
+			return eff
+
 		for paint_order, nodes in sorted(grouped_by_paint_order.items(), key=lambda x: -x[0]):
 			rects_to_add = []
 
 			for node in nodes:
-				if not node.original_node.snapshot_node or not node.original_node.snapshot_node.bounds:
-					continue  # shouldn't happen by how we filter them out in the first place
-
-				rect = Rect(
-					x1=node.original_node.snapshot_node.bounds.x,
-					y1=node.original_node.snapshot_node.bounds.y,
-					x2=node.original_node.snapshot_node.bounds.x + node.original_node.snapshot_node.bounds.width,
-					y2=node.original_node.snapshot_node.bounds.y + node.original_node.snapshot_node.bounds.height,
-				)
+				rect = _effective_rect(node)
+				if rect is None or rect.area() == 0:
+					continue  # no effective painted area
 
 				if rect_union.contains(rect):
 					node.ignored_by_paint_order = True
