@@ -190,16 +190,26 @@ class PaintOrderRemover:
 			base = _rect_from_node(node)
 			if base is None:
 				return None
-			current = parent_map.get(id(node))
-			eff = base
-			while current is not None:
-				parent_rect = _rect_from_node(current)
+			# Absolutely/fixed positioned elements should not be clipped by ancestors
+			styles = (
+				node.original_node.snapshot_node.computed_styles
+				if node.original_node and node.original_node.snapshot_node
+				else None
+			)
+			position_value = (styles.get('position', '') if styles else '').lower()
+			if position_value in ('fixed', 'absolute'):
+				cls = node.original_node.attributes.get('class', '') if node.original_node and node.original_node.attributes else ''
+				print(
+					f"[paint_order] skip ancestor clip due to position={position_value}: node(class='{cls}', rect={base})"
+				)
+				return base
+			# Intersect with the immediate parent, given parent intersects with its parent already
+			parent = parent_map.get(id(node))
+			if parent is not None:
+				parent_rect = _rect_from_node(parent)
 				if parent_rect is not None:
-					eff = _intersect(eff, parent_rect)
-					if eff is None:
-						return None
-				current = parent_map.get(id(current))
-			return eff
+					return _intersect(base, parent_rect)
+			return base
 
 		for paint_order, nodes in sorted(grouped_by_paint_order.items(), key=lambda x: -x[0]):
 			rects_to_add = []
