@@ -198,10 +198,6 @@ class PaintOrderRemover:
 			)
 			position_value = (styles.get('position', '') if styles else '').lower()
 			if position_value in ('fixed', 'absolute'):
-				cls = node.original_node.attributes.get('class', '') if node.original_node and node.original_node.attributes else ''
-				print(
-					f"[paint_order] skip ancestor clip due to position={position_value}: node(class='{cls}', rect={base})"
-				)
 				return base
 			# Intersect with the immediate parent, given parent intersects with its parent already
 			parent = parent_map.get(id(node))
