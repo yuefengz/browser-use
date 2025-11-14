@@ -185,26 +185,36 @@ class PaintOrderRemover:
 				return None
 			return Rect(x1=x1, y1=y1, x2=x2, y2=y2)
 
+		def _position_value(n: SimplifiedNode | None) -> str:
+			if not n or not n.original_node or not n.original_node.snapshot_node:
+				return ''
+			styles = n.original_node.snapshot_node.computed_styles or {}
+			return styles.get('position', '').lower()
+
+		def _is_abs_or_fixed(n: SimplifiedNode | None) -> bool:
+			return _position_value(n) in ('fixed', 'absolute')
+
 		def _effective_rect(node: SimplifiedNode) -> Rect | None:
 			"""Clamp node's rect by all ancestor rects that have bounds (approximates clipping)."""
 			base = _rect_from_node(node)
 			if base is None:
 				return None
 			# Absolutely/fixed positioned elements should not be clipped by ancestors
-			styles = (
-				node.original_node.snapshot_node.computed_styles
-				if node.original_node and node.original_node.snapshot_node
-				else None
-			)
-			position_value = (styles.get('position', '') if styles else '').lower()
-			if position_value in ('fixed', 'absolute'):
+			if _is_abs_or_fixed(node):
 				return base
-			# Intersect with the immediate parent, given parent intersects with its parent already
-			parent = parent_map.get(id(node))
-			if parent is not None:
-				parent_rect = _rect_from_node(parent)
+
+			current_parent = parent_map.get(id(node))
+			while current_parent is not None:
+				parent_rect = _rect_from_node(current_parent)
 				if parent_rect is not None:
-					return _intersect(base, parent_rect)
+					base = _intersect(base, parent_rect)
+					if base is None:
+						return None
+				# Stop climbing once we encounter an ancestor that should not be clipped further
+				if _is_abs_or_fixed(current_parent):
+					break
+				current_parent = parent_map.get(id(current_parent))
+
 			return base
 
 		for paint_order, nodes in sorted(grouped_by_paint_order.items(), key=lambda x: -x[0]):
@@ -213,6 +223,7 @@ class PaintOrderRemover:
 			for node in nodes:
 				rect = _effective_rect(node)
 				if rect is None or rect.area() == 0:
+					node.ignored_by_paint_order = True
 					continue  # no effective painted area
 
 				if rect_union.contains(rect):
