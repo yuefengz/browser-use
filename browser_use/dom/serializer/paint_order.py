@@ -194,6 +194,29 @@ class PaintOrderRemover:
 		def _is_abs_or_fixed(n: SimplifiedNode | None) -> bool:
 			return _position_value(n) in ('fixed', 'absolute')
 
+		def _is_clipping_ancestor(n: SimplifiedNode | None) -> bool:
+			"""
+			Return True if this ancestor should clip its children based on overflow properties.
+			We only treat it as clipping when overflow / overflow-x / overflow-y are explicitly
+			set to a value other than 'visible'.
+			"""
+			if not n or not n.original_node or not n.original_node.snapshot_node:
+				return False
+
+			styles = n.original_node.snapshot_node.computed_styles or {}
+
+			def _is_non_visible(val: str | None) -> bool:
+				if not val:
+					return False
+				v = val.lower()
+				return v != 'visible'
+
+			return (
+				_is_non_visible(styles.get('overflow'))
+				or _is_non_visible(styles.get('overflow-x'))
+				or _is_non_visible(styles.get('overflow-y'))
+			)
+
 		def _effective_rect(node: SimplifiedNode) -> Rect | None:
 			"""Clamp node's rect by all ancestor rects that have bounds (approximates clipping)."""
 			base = _rect_from_node(node)
@@ -206,7 +229,8 @@ class PaintOrderRemover:
 			current_parent = parent_map.get(id(node))
 			while current_parent is not None:
 				parent_rect = _rect_from_node(current_parent)
-				if parent_rect is not None:
+				# Only intersect when this ancestor actually clips its children (overflow != visible)
+				if parent_rect is not None and _is_clipping_ancestor(current_parent):
 					base = _intersect(base, parent_rect)
 					if base is None:
 						return None
