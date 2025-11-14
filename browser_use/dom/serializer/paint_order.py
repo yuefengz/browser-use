@@ -1,14 +1,11 @@
 from collections import defaultdict
 from dataclasses import dataclass
-import logging
 
 from browser_use.dom.views import SimplifiedNode
 
 """
 Helper class for maintaining a union of rectangles (used for order of elements calculation)
 """
-
-logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, slots=True)
