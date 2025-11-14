@@ -242,7 +242,7 @@ class PaintOrderRemover:
 			return base
 
 		for paint_order, nodes in sorted(grouped_by_paint_order.items(), key=lambda x: -x[0]):
-			rects_to_add: list[Rect] = []
+			rects_to_add = []
 
 			for node in nodes:
 				rect = _effective_rect(node)
