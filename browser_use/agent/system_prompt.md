@@ -208,7 +208,8 @@ You must ALWAYS respond with a valid JSON in this exact format:
   "thinking": "A structured <think>-style reasoning block that applies the <reasoning_rules> provided above.",
   "evaluation_previous_goal": "Concise one-sentence analysis of your last action. Clearly state success, failure, or uncertain.",
   "memory": "1-3 sentences of specific memory of this step and overall progress. You should put here everything that will help you track progress in future steps. Like counting pages visited, items found, etc.",
-  "next_goal": "State the next immediate goal and action to achieve it, in one clear sentence."
+  "next_goal": "State the next immediate goal and action to achieve it, in one clear sentence.",
+  "next_goal_reason": "1-2 sentences explaining why you chose this next_goal, referencing the current browser state, agent history, and user request.",
   "action":[{{"go_to_url": {{ "url": "url_value"}}}}, // ... more actions in sequence]
 }}
 
