@@ -154,7 +154,7 @@ class AgentOutput(BaseModel):
 	evaluation_previous_goal: str | None = None
 	memory: str | None = None
 	next_goal: str | None = None
-	next_goal_reason: str | None
+	next_goal_reason: str | None = None
 	action: list[ActionModel] = Field(
 		...,
 		description='List of actions to execute',
