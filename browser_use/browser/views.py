@@ -77,6 +77,9 @@ class BrowserStateSummary:
 	tabs: list[TabInfo]
 	screenshot: str | None = field(default=None, repr=False)
 	clean_screenshot: str | None = field(default=None, repr=False)
+	# Timestamp (epoch seconds) when the screenshot was captured.
+	# This is recorded immediately after the screenshot data is produced.
+	screenshot_captured_at: float | None = None
 	page_info: PageInfo | None = None  # Enhanced page information
 
 	# Keep legacy fields for backward compatibility
@@ -97,6 +100,8 @@ class BrowserStateHistory:
 	interacted_element: list[DOMInteractedElement | None] | list[None]
 	screenshot_path: str | None = None
 	clean_screenshot_path: str | None = None
+	# Timestamp (epoch seconds) when the screenshot was captured, as reported by BrowserStateSummary.
+	screenshot_captured_at: float | None = None
 
 	def get_screenshot(self) -> str | None:
 		"""Load screenshot from disk and return as base64 string"""
@@ -122,6 +127,7 @@ class BrowserStateHistory:
 		data['tabs'] = [tab.model_dump() for tab in self.tabs]
 		data['screenshot_path'] = self.screenshot_path
 		data['clean_screenshot_path'] = self.clean_screenshot_path
+		data['screenshot_captured_at'] = self.screenshot_captured_at
 		data['interacted_element'] = [el.to_dict() if el else None for el in self.interacted_element]
 		data['url'] = self.url
 		data['title'] = self.title

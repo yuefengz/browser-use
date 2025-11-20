@@ -986,6 +986,7 @@ class Agent(Generic[Context, AgentStructuredOutput]):
 			interacted_element=interacted_elements,
 			screenshot_path=screenshot_path,
 			clean_screenshot_path=clean_screenshot_path,
+			screenshot_captured_at=browser_state_summary.screenshot_captured_at,
 		)
 
 		history_item = AgentHistory(

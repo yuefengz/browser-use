@@ -199,8 +199,10 @@ class DOMWatchdog(BaseWatchdog):
 				dom_task = asyncio.create_task(self._build_dom_tree_without_highlights(previous_state))
 
 			# Start clean screenshot task if requested (without JS highlights)
+			screenshot_captured_at: float | None = None
 			if event.include_screenshot:
 				self.logger.debug('🔍 DOMWatchdog.on_BrowserStateRequestEvent: 📸 Starting clean screenshot task...')
+				screenshot_captured_at = time.time()
 				screenshot_task = asyncio.create_task(self._capture_clean_screenshot())
 
 			# Wait for both tasks to complete
@@ -308,6 +310,7 @@ class DOMWatchdog(BaseWatchdog):
 				tabs=tabs_info,
 				screenshot=screenshot_b64,
 				clean_screenshot=clean_screenshot_b64,
+				screenshot_captured_at=screenshot_captured_at,
 				page_info=page_info,
 				pixels_above=0,
 				pixels_below=0,
