@@ -265,6 +265,15 @@ class AgentHistory(BaseModel):
 		elements = []
 		for action in model_output.action:
 			index = action.get_index()
+			
+			# Special case: scroll action uses 'frame_element_index' instead of 'index'
+			if index is None:
+				params = action.model_dump(exclude_unset=True).values()
+				for param in params:
+					if param is not None and 'frame_element_index' in param:
+						index = param['frame_element_index']
+						break
+			
 			if index is not None and index in selector_map:
 				el = selector_map[index]
 				elements.append(DOMInteractedElement.load_from_enhanced_dom_tree(el))
