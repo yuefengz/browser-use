@@ -150,7 +150,7 @@ class TypeTextEvent(ElementSelectedEvent[dict | None]):
 	event_timeout: float | None = _get_timeout('TIMEOUT_TypeTextEvent', 15.0)  # seconds
 
 
-class ScrollEvent(ElementSelectedEvent[None]):
+class ScrollEvent(ElementSelectedEvent[dict | None]):
 	"""Scroll the page or element."""
 
 	direction: Literal['up', 'down', 'left', 'right']

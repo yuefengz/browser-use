@@ -744,7 +744,7 @@ You will be given a query and the markdown of a webpage that has been filtered t
 					ScrollEvent(direction='down' if params.down else 'up', amount=pixels, node=node)
 				)
 				await event
-				await event.event_result(raise_if_any=True, raise_if_none=False)
+				scroll_metadata = await event.event_result(raise_if_any=True, raise_if_none=False)
 				direction = 'down' if params.down else 'up'
 
 				# If index is 0 or None, we're scrolling the page
@@ -761,7 +761,11 @@ You will be given a query and the markdown of a webpage that has been filtered t
 
 				msg = f'🔍 {long_term_memory}'
 				logger.info(msg)
-				return ActionResult(extracted_content=msg, long_term_memory=long_term_memory)
+				return ActionResult(
+					extracted_content=msg, 
+					long_term_memory=long_term_memory,
+					metadata=scroll_metadata
+				)
 			except Exception as e:
 				logger.error(f'Failed to dispatch ScrollEvent: {type(e).__name__}: {e}')
 				error_msg = 'Failed to execute scroll action.'
