@@ -162,7 +162,8 @@ class PaintOrderRemover:
 			if node.original_node.snapshot_node and node.original_node.snapshot_node.paint_order is not None:
 				grouped_by_paint_order[node.original_node.snapshot_node.paint_order].append(node)
 
-		rect_union = RectUnionPure()
+		# Track rectangles we added for coverage checks
+		active_rects: list[tuple[Rect, SimplifiedNode]] = []
 
 		def _rect_from_node(n: SimplifiedNode) -> Rect | None:
 			if not n.original_node.snapshot_node or not n.original_node.snapshot_node.bounds:
@@ -241,8 +242,34 @@ class PaintOrderRemover:
 
 			return base
 
+		def _is_descendant(node: SimplifiedNode, ancestor: SimplifiedNode) -> bool:
+			"""Return True if `node` is a (direct or indirect) descendant of `ancestor`."""
+			current_parent = parent_map.get(id(node))
+			while current_parent is not None:
+				if current_parent is ancestor:
+					return True
+				current_parent = parent_map.get(id(current_parent))
+			return False
+
+		def _is_covered_by_non_descendants(target_rect: Rect, target_node: SimplifiedNode) -> bool:
+			"""
+			Check if `target_rect` is fully covered by the union of previously
+			painted rects that do NOT belong to descendants of `target_node`.
+			"""
+			if not active_rects:
+				return False
+
+			union = RectUnionPure()
+			for existing_rect, existing_node in active_rects:
+				if _is_descendant(existing_node, target_node):
+					# Skip rectangles from our own descendants
+					continue
+				union.add(existing_rect)
+
+			return union.contains(target_rect)
+
 		for paint_order, nodes in sorted(grouped_by_paint_order.items(), key=lambda x: -x[0]):
-			rects_to_add = []
+			rects_to_add: list[tuple[Rect, SimplifiedNode]] = []
 
 			for node in nodes:
 				rect = _effective_rect(node)
@@ -250,7 +277,7 @@ class PaintOrderRemover:
 					node.ignored_by_paint_order = True
 					continue  # no effective painted area
 
-				if rect_union.contains(rect):
+				if _is_covered_by_non_descendants(rect, node):
 					node.ignored_by_paint_order = True
 
 				# don't add to the nodes if opacity is less then 0.95 or background-color is transparent
@@ -265,9 +292,9 @@ class PaintOrderRemover:
 				):
 					continue
 
-				rects_to_add.append(rect)
+				rects_to_add.append((rect, node))
 
-			for rect in rects_to_add:
-				rect_union.add(rect)
+			for rect, n in rects_to_add:
+				active_rects.append((rect, n))
 
 		return None
