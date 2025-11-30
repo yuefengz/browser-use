@@ -1394,7 +1394,7 @@ class DefaultActionWatchdog(BaseWatchdog):
 								content_quad = box_model['model']['content']
 								center_x = (content_quad[0] + content_quad[2] + content_quad[4] + content_quad[6]) / 4
 								center_y = (content_quad[1] + content_quad[3] + content_quad[5] + content_quad[7]) / 4
-								return {'scroll_x': center_x, 'scroll_y': center_y}
+								return {'scroll_x': center_x, 'scroll_y': center_y, "is_iframe": True}
 							except Exception:
 								return {'scroll_x': 0, 'scroll_y': 0}
 						else:
