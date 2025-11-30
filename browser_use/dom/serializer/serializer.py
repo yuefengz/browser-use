@@ -551,9 +551,11 @@ class DOMTreeSerializer:
 			# Regular interactive element assignment (including enhanced compound controls)
 			is_interactive_assign = self._is_interactive_cached(node.original_node)
 			is_visible = node.original_node.snapshot_node and node.original_node.is_visible
+			should_show_scroll_info = node.original_node.should_show_scroll_info
 
-			# Only add to selector map if element is both interactive AND visible
-			if is_interactive_assign and is_visible:
+			# Only add to selector map if element is interactive OR is a scroll container to show scroll info,
+			# and is visible.
+			if (is_interactive_assign or should_show_scroll_info) and is_visible:
 				node.interactive_index = self._interactive_counter
 				node.original_node.element_index = self._interactive_counter
 				self._selector_map[self._interactive_counter] = node.original_node
