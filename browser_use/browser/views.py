@@ -5,7 +5,7 @@ from bubus import BaseEvent
 from cdp_use.cdp.target import TargetID
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_serializer
 
-from browser_use.dom.views import DOMInteractedElement, SerializedDOMState
+from browser_use.dom.views import DOMInteractedElement, EnhancedDOMTreeNode, SerializedDOMState
 
 # Known placeholder image data for about:blank pages - a 4x4 white PNG
 PLACEHOLDER_4PX_SCREENSHOT = (
@@ -89,6 +89,12 @@ class BrowserStateSummary:
 	is_pdf_viewer: bool = False  # Whether the current page is a PDF viewer
 	recent_events: str | None = None  # Text summary of recent browser events
 
+	# Debug fields
+	# Text representation of the clickable-aware DOM used by the agent
+	dom_text: str | None = None
+	# Root of the enhanced DOM tree combining DOM, AX and snapshot data
+	enhanced_dom_tree: EnhancedDOMTreeNode | None = None
+
 
 @dataclass
 class BrowserStateHistory:
@@ -102,6 +108,10 @@ class BrowserStateHistory:
 	clean_screenshot_path: str | None = None
 	# Timestamp (epoch seconds) when the screenshot was captured, as reported by BrowserStateSummary.
 	screenshot_captured_at: float | None = None
+
+	# Debug fields
+	dom_text: str | None = None
+	enhanced_dom_tree: EnhancedDOMTreeNode | None = None
 
 	def get_screenshot(self) -> str | None:
 		"""Load screenshot from disk and return as base64 string"""
@@ -131,6 +141,8 @@ class BrowserStateHistory:
 		data['interacted_element'] = [el.to_dict() if el else None for el in self.interacted_element]
 		data['url'] = self.url
 		data['title'] = self.title
+		data['dom_text'] = self.dom_text
+		data['enhanced_dom_tree'] = self.enhanced_dom_tree.__json__() if self.enhanced_dom_tree else None
 		return data
 
 

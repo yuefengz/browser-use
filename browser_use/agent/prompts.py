@@ -245,6 +245,10 @@ class AgentMessagePrompt:
 		else:
 			elements_text = 'empty page'
 
+		# Store the exact DOM text region that the model sees (after attribute filtering and truncation)
+		# for debugging and history purposes.
+		self.browser_state.dom_text = elements_text
+
 		tabs_text = ''
 		current_tab_candidates = []
 
