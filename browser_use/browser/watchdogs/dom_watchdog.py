@@ -317,6 +317,8 @@ class DOMWatchdog(BaseWatchdog):
 				browser_errors=[],
 				is_pdf_viewer=is_pdf_viewer,
 				recent_events=self._get_recent_events_str() if event.include_recent_events else None,
+				# dom_text is populated later in AgentMessagePrompt using agent settings
+				enhanced_dom_tree=self.enhanced_dom_tree,
 			)
 
 			# Cache the state

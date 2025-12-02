@@ -987,6 +987,9 @@ class Agent(Generic[Context, AgentStructuredOutput]):
 			screenshot_path=screenshot_path,
 			clean_screenshot_path=clean_screenshot_path,
 			screenshot_captured_at=browser_state_summary.screenshot_captured_at,
+			# Debug fields for transparency:
+			dom_text=browser_state_summary.dom_text,
+			enhanced_dom_tree=browser_state_summary.enhanced_dom_tree,
 		)
 
 		history_item = AgentHistory(
