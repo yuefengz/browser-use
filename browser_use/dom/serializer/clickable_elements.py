@@ -34,9 +34,16 @@ class ClickableElementDetector:
 
 		# SEARCH ELEMENT DETECTION: Check for search-related classes and attributes
 		if node.attributes:
-			# HACK: Treat specific app list items as clickable by class name
 			class_attr = node.attributes.get('class', '')
+			# HACK: Treat specific app list items as clickable by class name
+			# for https://qa.getdoable.ai/domains/testyicheng/cases/Add_form_in_About_project_drawer
+			# TODO: replace this with snapshot_node.is_clickable?
 			if isinstance(class_attr, str) and 'form-template-list-item' in class_attr.lower():
+				return True
+			# HACK: Treat specific persona items as clickable by class name - want it
+			# to be hoverable for https://qa.getdoable.ai/domains/testyicheng/cases/Hover%20and%20Edit%20in%20ICP%20page
+			# TODO: want a better hoverable solution for non-assigned-index elements
+			if isinstance(class_attr, str) and 'persona-item' in class_attr.lower():
 				return True
 
 			search_indicators = {
