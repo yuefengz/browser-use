@@ -495,9 +495,14 @@ class DOMTreeSerializer:
 					return simplified
 
 		elif node.node_type == NodeType.TEXT_NODE:
-			# Include meaningful text nodes
+			# Include meaningful text nodes.
+			# NOTE: we intentionally do NOT enforce a minimum text length here.
+			# Single-character nodes (for example list bullets like "•") are
+			# semantically meaningful and must be preserved for the LLM, so
+			# we avoid filtering them out by length.
+			# Ref example: https://qa.getdoable.ai/domains/testyicheng/cases/count%20ICP%20items
 			is_visible = node.snapshot_node and node.is_visible
-			if is_visible and node.node_value and node.node_value.strip() and len(node.node_value.strip()) > 1:
+			if is_visible and node.node_value and node.node_value.strip():
 				return SimplifiedNode(original_node=node, children=[])
 
 		return None
@@ -870,12 +875,16 @@ class DOMTreeSerializer:
 
 		elif node.original_node.node_type == NodeType.TEXT_NODE:
 			# Include visible text
+			# NOTE: we intentionally do NOT enforce a minimum text length here.
+			# Single-character nodes (for example list bullets like "•") are
+			# semantically meaningful and must be preserved for the LLM, so
+			# we avoid filtering them out by length.
+			# Ref example: https://qa.getdoable.ai/domains/testyicheng/cases/count%20ICP%20items
 			is_visible = node.original_node.snapshot_node and node.original_node.is_visible
 			if (
 				is_visible
 				and node.original_node.node_value
 				and node.original_node.node_value.strip()
-				and len(node.original_node.node_value.strip()) > 1
 			):
 				clean_text = node.original_node.node_value.strip()
 				formatted_text.append(f'{depth_str}{clean_text}')
