@@ -495,7 +495,7 @@ class DOMTreeSerializer:
 					return simplified
 
 		elif node.node_type == NodeType.TEXT_NODE:
-			# Include meaningful text nodes.
+			# Include meaningful text nodes
 			# NOTE: we intentionally do NOT enforce a minimum text length here.
 			# Single-character nodes (for example list bullets like "•") are
 			# semantically meaningful and must be preserved for the LLM, so
