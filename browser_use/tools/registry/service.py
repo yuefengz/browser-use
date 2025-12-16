@@ -330,6 +330,7 @@ class Registry(Generic[Context]):
 			except Exception as e:
 				raise ValueError(f'Invalid parameters {params} for action {action_name}: {type(e)}: {e}') from e
 
+			did_replace_sensitive_data = False
 			if sensitive_data:
 				# Get current URL if browser_session is provided
 				current_url = None
@@ -343,14 +344,16 @@ class Registry(Generic[Context]):
 								break
 					except Exception:
 						pass
-				validated_params = self._replace_sensitive_data(validated_params, sensitive_data, current_url)
+				validated_params, did_replace_sensitive_data = self._replace_sensitive_data(
+					validated_params, sensitive_data, current_url
+				)
 
 			# Build special context dict
 			special_context = {
 				'browser_session': browser_session,
 				'page_extraction_llm': page_extraction_llm,
 				'available_file_paths': available_file_paths,
-				'has_sensitive_data': action_name == 'input_text' and bool(sensitive_data),
+				'has_sensitive_data': action_name == 'input_text' and did_replace_sensitive_data,
 				'file_system': file_system,
 			}
 
@@ -397,7 +400,7 @@ class Registry(Generic[Context]):
 
 	def _replace_sensitive_data(
 		self, params: BaseModel, sensitive_data: dict[str, Any], current_url: str | None = None
-	) -> BaseModel:
+	) -> tuple[BaseModel, bool]:
 		"""
 		Replaces sensitive data placeholders in params with actual values.
 
@@ -408,7 +411,8 @@ class Registry(Generic[Context]):
 			current_url: Optional current URL for domain matching
 
 		Returns:
-			BaseModel: The parameter object with placeholders replaced by actual values
+			(BaseModel, bool): The parameter object with placeholders replaced by actual values,
+			and whether any placeholder was actually replaced.
 		"""
 		secret_pattern = re.compile(r'<secret>(.*?)</secret>')
 
@@ -472,7 +476,7 @@ class Registry(Generic[Context]):
 		if all_missing_placeholders:
 			logger.warning(f'Missing or empty keys in sensitive_data dictionary: {", ".join(all_missing_placeholders)}')
 
-		return type(params).model_validate(processed_params)
+		return type(params).model_validate(processed_params), bool(replaced_placeholders)
 
 	# @time_execution_sync('--create_action_model')
 	def create_action_model(self, include_actions: list[str] | None = None, page_url: str | None = None) -> type[ActionModel]:
