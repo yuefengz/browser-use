@@ -812,6 +812,16 @@ class DOMTreeSerializer:
 						else:
 							attributes_html_str = compound_attr
 
+				# Extract SVG icon from excluded child elements (helps distinguish icon buttons)
+				# Only extracts icon when children are excluded/not displayed
+				svg_icon = DOMTreeSerializer._extract_svg_icon_from_excluded_children(node)
+				if svg_icon:
+					icon_attr = f'icon={svg_icon}'
+					if attributes_html_str:
+						attributes_html_str += f' {icon_attr}'
+					else:
+						attributes_html_str = icon_attr
+
 				# Build the line with shadow host indicator
 				shadow_prefix = ''
 				if node.is_shadow_host:
@@ -897,6 +907,52 @@ class DOMTreeSerializer:
 					formatted_text.append(child_text)
 
 		return '\n'.join(formatted_text)
+
+	@staticmethod
+	def _extract_svg_icon_from_excluded_children(node: SimplifiedNode, max_depth: int = 3) -> str | None:
+		"""
+		Extract data-icon attribute from child SVG elements that are excluded by parent bounds.
+
+		This helps distinguish between icon buttons that otherwise serialize identically.
+		For example, a download button with <svg data-icon="cloud-arrow-down">
+		vs a close button with <svg data-icon="xmark-large">.
+
+		The icon is only extracted when the child element has:
+		- excluded_by_parent=True (hidden due to parent bounding box)
+		- AND should_display=True (would otherwise be visible)
+
+		This targets elements that are specifically hidden due to parent bounds exclusion,
+		not elements that shouldn't display for other reasons.
+
+		Args:
+			node: The SimplifiedNode to search for SVG children
+			max_depth: Maximum depth to search (default 3 to avoid deep traversal)
+
+		Returns:
+			The data-icon value if found in an excluded path, None otherwise
+		"""
+		if max_depth <= 0:
+			return None
+
+		for child in node.children:
+			# Only look at children that are excluded by parent but would otherwise display
+			# This targets elements hidden due to parent bounds, not elements that shouldn't display
+			if not (child.excluded_by_parent and child.should_display):
+				continue
+
+			original = child.original_node
+			# Check if this child is an SVG element
+			if original.tag_name.lower() == 'svg' and original.attributes:
+				data_icon = original.attributes.get('data-icon')
+				if data_icon:
+					return str(data_icon).strip()
+
+			# Recursively search excluded children
+			found = DOMTreeSerializer._extract_svg_icon_from_excluded_children(child, max_depth - 1)
+			if found:
+				return found
+
+		return None
 
 	@staticmethod
 	def _build_attributes_string(node: EnhancedDOMTreeNode, include_attributes: list[str], text: str) -> str:
