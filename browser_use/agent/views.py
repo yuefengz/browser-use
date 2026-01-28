@@ -42,6 +42,9 @@ class AgentSettings(BaseModel):
 	override_system_message: str | None = None
 	extend_system_message: str | None = None
 	include_attributes: list[str] | None = DEFAULT_INCLUDE_ATTRIBUTES
+	# If provided, only these class tokens are exposed in DOM as class="<tokens...>".
+	# If None/empty, class is omitted (even if 'class' is in include_attributes).
+	include_class_tokens: list[str] | None = None
 	max_actions_per_step: int = 4
 	use_thinking: bool = True
 	flash_mode: bool = False  # If enabled, disables evaluation_previous_goal and next_goal, and sets use_thinking = False

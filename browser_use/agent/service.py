@@ -176,6 +176,7 @@ class Agent(Generic[Context, AgentStructuredOutput]):
 		display_files_in_done_text: bool = True,
 		include_tool_call_examples: bool = False,
 		vision_detail_level: Literal['auto', 'low', 'high'] = 'auto',
+		include_class_tokens: list[str] | None = None,
 		llm_timeout: int = 90,
 		step_timeout: int = 120,
 		directly_open_url: bool = True,
@@ -258,6 +259,7 @@ class Agent(Generic[Context, AgentStructuredOutput]):
 			extend_system_message=extend_system_message,
 			generate_gif=generate_gif,
 			include_attributes=include_attributes,
+			include_class_tokens=include_class_tokens,
 			max_actions_per_step=max_actions_per_step,
 			use_thinking=use_thinking,
 			flash_mode=flash_mode,
@@ -349,6 +351,7 @@ class Agent(Generic[Context, AgentStructuredOutput]):
 			use_thinking=self.settings.use_thinking,
 			# Settings that were previously in MessageManagerSettings
 			include_attributes=self.settings.include_attributes,
+			include_class_tokens=self.settings.include_class_tokens,
 			sensitive_data=sensitive_data,
 			max_history_items=self.settings.max_history_items,
 			vision_detail_level=self.settings.vision_detail_level,
